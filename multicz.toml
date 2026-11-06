@@ -35,5 +35,8 @@ types = ["perf"]
 # Curated: only what is compiled counts toward a release. Docs, CI and
 # tooling are intentionally untracked; a release-relevant change in an
 # untracked file is invisible.
-paths = ["src/**", "Makefile"]
+paths = ["src/**", "include/**", "Makefile"]
+bump_files = [
+    { file = "include/base.h", key = "regex:BASE_VERSION\\s+\"([^\"]+)\"" },
+]
 changelog = "CHANGELOG.md"
