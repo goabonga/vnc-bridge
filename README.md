@@ -14,6 +14,10 @@ make lint           # clang-tidy
 make format         # apply clang-format
 ```
 
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md).
+
 ## License
 
 [MIT](LICENSE)
