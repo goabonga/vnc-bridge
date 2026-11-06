@@ -1,11 +1,12 @@
 # vnc-bridge-fido
 
-Lists USB FIDO authenticators and exports one of them over standard input and
-output with a small binary protocol.
+Lists USB FIDO authenticators, checks that one answers, and exports one of them
+over standard input and output with a small binary protocol.
 
 ```sh
 make build
 build/bin/vnc-bridge-fido list
+build/bin/vnc-bridge-fido probe --device /dev/hidraw3
 build/bin/vnc-bridge-fido export --device /dev/hidraw3
 ```
 
@@ -20,6 +21,21 @@ build/bin/vnc-bridge-fido export --device /dev/hidraw3
 Only hidraw nodes of USB devices whose report descriptor is a single unnumbered
 FIDO application collection (usage page `0xF1D0`) with 64-byte input and output
 reports are listed. Control characters in the name are replaced with `_`.
+
+## probe
+
+`probe --device /dev/hidrawN` opens the device exclusively and sends a CTAPHID_INIT
+request with a random nonce on the broadcast channel. INIT only negotiates a
+channel: nothing is registered or signed. When the answer carries the nonce, it
+prints
+
+```
+CTAPHID_INIT OK; HID framing=2; capabilities=0x05
+```
+
+(the values are bytes 19 and 23 of the answer) and exits with status 0. After 3
+seconds without a matching answer it prints `FIDO INIT timed out` on standard error
+and exits with status 1.
 
 ## export
 
