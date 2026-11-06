@@ -23,6 +23,8 @@ make install    # under $(PREFIX)/bin, default /usr/local, honouring DESTDIR
   backgrounds, see [docs/i3blocks.md](docs/i3blocks.md).
 - `vnc-bridge-pcsc`: lists PC/SC channel sockets and runs a program using
   one, see [docs/pcsc.md](docs/pcsc.md).
+- `vnc-bridge-shell`: connects the terminal to a shell channel socket, see
+  [docs/shell.md](docs/shell.md).
 - `vnc-bridge-telemetry`: prints battery and volume blocks from client
   measurements, see [docs/telemetry.md](docs/telemetry.md).
 - `vnc-bridge-wifi`: i3blocks block showing Wi-Fi signal strength, see
