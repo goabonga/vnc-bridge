@@ -6,6 +6,13 @@
 
 Native C11 companion utilities for TigerVNC on Arch Linux.
 
+## Build
+
+```bash
+make build      # binaries are written to build/bin/
+make install    # under $(PREFIX)/bin, default /usr/local, honouring DESTDIR
+```
+
 ## Tests
 
 ```bash
