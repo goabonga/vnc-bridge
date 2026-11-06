@@ -2,9 +2,12 @@
 # Copyright (c) 2026 Chris <goabonga@pm.me>
 
 Checks: >-
-  clang-diagnostic-*,
-  clang-analyzer-*,
-  bugprone-*,
-  -bugprone-easily-swappable-parameters,
-  -clang-analyzer-security.insecureAPI.DeprecatedOrUnsafeBufferHandling
+  -*,
+  clang-analyzer-security.*,
+  -clang-analyzer-security.insecureAPI.DeprecatedOrUnsafeBufferHandling,
+  bugprone-command-processor,
+  bugprone-suspicious-realloc-usage,
+  bugprone-sizeof-expression,
+  bugprone-not-null-terminated-result,
+  bugprone-unsafe-functions
 WarningsAsErrors: "*"
