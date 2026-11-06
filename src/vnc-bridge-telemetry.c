@@ -5,6 +5,7 @@
 #include <dirent.h>
 #include <json-c/json.h>
 #include <limits.h>
+#include <math.h>
 #include <stdio.h>
 
 typedef struct json_object J;
@@ -164,6 +165,151 @@ static void local_battery(const char *root)
 		puts("");
 }
 
+/* Parse a "mixer --get" reply, "<percent|-> <on|off|->". The volume stays -1
+ * when the reply is malformed or the control has no volume. */
+static void parse_mixer_reply(const char *reply, int *volume, bool *muted)
+{
+	*volume = -1;
+	*muted = false;
+	char *end;
+	long n = -1;
+	if (*reply == '-')
+		end = (char *)reply + 1;
+	else if (isdigit((unsigned char)*reply))
+		n = strtol(reply, &end, 10);
+	else
+		return;
+	if (*end != ' ')
+		return;
+	const char *state = end + 1;
+	size_t len = strcspn(state, " \t\r\n");
+	const char *tail = state + len;
+	while (isspace((unsigned char)*tail))
+		tail++;
+	bool off = len == 3 && !strncmp(state, "off", 3);
+	bool on = len == 2 && !strncmp(state, "on", 2);
+	bool none = len == 1 && *state == '-';
+	if (*tail || !(off || on || none))
+		return;
+	if (n >= 0 && n <= 1000) {
+		*volume = (int)n;
+		*muted = off;
+	}
+}
+
+/* Parse amixer "sget" output: the loudest channel, muted when no channel is
+ * on. */
+static void parse_amixer(char *output, int *volume, bool *muted)
+{
+	bool any_state = false, any_on = false;
+	for (char *line = output; line && *line;) {
+		char *end = strchr(line, '\n');
+		if (end)
+			*end = 0;
+		if (strstr(line, "Playback")) {
+			for (char *p = line; (p = strchr(p, '['));) {
+				int n, used = 0;
+				if (sscanf(p, "[%d%%]%n", &n, &used) == 1 &&
+				    used > 0) {
+					if (n > *volume)
+						*volume = n;
+					if (strstr(p + used, "[on]"))
+						any_state = any_on = true;
+					if (strstr(p + used, "[off]"))
+						any_state = true;
+					break;
+				}
+				p++;
+			}
+		}
+		line = end ? end + 1 : NULL;
+	}
+	*muted = any_state && !any_on;
+}
+
+/* Parse "wpctl get-volume" output: "Volume: 0.38" with an optional
+ * "[MUTED]". */
+static void parse_wpctl(const char *output, int *volume, bool *muted)
+{
+	double level;
+	int used = 0;
+	if (sscanf(output, "Volume: %lf%n", &level, &used) != 1 ||
+	    !isfinite(level) || level < 0 || level > 10)
+		return;
+	const char *p = output + used;
+	while (isspace((unsigned char)*p))
+		p++;
+	if (!strncmp(p, "[MUTED]", 7)) {
+		*muted = true;
+		p += 7;
+	}
+	while (isspace((unsigned char)*p))
+		p++;
+	if (!*p)
+		*volume = (int)nearbyint(level * 100);
+}
+
+static const char *env_or(const char *name, const char *fallback)
+{
+	const char *value = getenv(name);
+	return value ? value : fallback;
+}
+
+/* Print the audio block of the local machine. cards_path is the ALSA card
+ * list used to recognize the GPD Pocket sound card. */
+static void local_audio(const char *cards_path)
+{
+	char *cards = read_file(cards_path);
+	bool pocket = cards && strstr(cards, "chtrt5645");
+	free(cards);
+	const char *backend =
+	    env_or("VNC_BRIDGE_AUDIO_BACKEND", pocket ? "alsa" : "pipewire");
+	bool alsa = !strcmp(backend, "alsa");
+	if (!alsa && strcmp(backend, "pipewire")) {
+		puts("");
+		return;
+	}
+	const char *card =
+	    env_or("VNC_BRIDGE_ALSA_CARD", pocket ? "chtrt5645" : "default");
+	const char *control =
+	    env_or("VNC_BRIDGE_ALSA_CONTROL", pocket ? "DAC1" : "Master");
+	const char *tool = env_or("VNC_BRIDGE_ALSA_TOOL", "");
+	if (!*tool)
+		tool =
+		    pocket && !strcmp(card, "chtrt5645") ? "mixer" : "amixer";
+
+	int volume = -1;
+	bool muted = false, answered = false;
+	if (alsa && !strcmp(tool, "mixer")) {
+		char target[128];
+		snprintf(target, sizeof target, "sysdefault:%s", card);
+		char *mixer[] = {"mixer", "--card",	   target,
+				 "--get", (char *)control, NULL};
+		char *reply = capture(mixer, 1000);
+		if (reply) {
+			parse_mixer_reply(reply, &volume, &muted);
+			free(reply);
+			answered = true;
+		}
+	}
+	if (!answered) {
+		char *amixer[] = {"amixer",	   "-c", (char *)card, "sget",
+				  (char *)control, NULL};
+		char *wpctl[] = {"wpctl", "get-volume", "@DEFAULT_AUDIO_SINK@",
+				 NULL};
+		char *output = capture(alsa ? amixer : wpctl, 1000);
+		if (output && alsa)
+			parse_amixer(output, &volume, &muted);
+		else if (output)
+			parse_wpctl(output, &volume, &muted);
+		free(output);
+	}
+	if (volume >= 0 && volume <= 1000)
+		print_audio(volume, muted);
+	else
+		puts("");
+}
+
 typedef struct {
 	const char *client;
 	const char *hostname;
@@ -250,7 +396,7 @@ int main(int argc, char **argv)
 		}
 		if (!strcmp(argv[i], "--help")) {
 			puts("Usage: vnc-bridge-telemetry "
-			     "{battery,audio,status,local-battery} "
+			     "{battery,audio,status,local-battery,local-audio} "
 			     "[--runtime-dir DIR] [--hostname HOST] [--client "
 			     "PID:FD] "
 			     "[--hide-unavailable] [--i3blocks]");
@@ -277,6 +423,10 @@ int main(int argc, char **argv)
 		return 2;
 	if (!strcmp(command, "local-battery")) {
 		local_battery("/sys/class/power_supply");
+		return 0;
+	}
+	if (!strcmp(command, "local-audio")) {
+		local_audio("/proc/asound/cards");
 		return 0;
 	}
 	bool battery = !strcmp(command, "battery");
