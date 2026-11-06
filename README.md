@@ -13,6 +13,11 @@ make build      # binaries are written to build/bin/
 make install    # under $(PREFIX)/bin, default /usr/local, honouring DESTDIR
 ```
 
+## Programs
+
+- `vnc-bridge-wifi`: i3blocks block showing Wi-Fi signal strength, see
+  [docs/wifi.md](docs/wifi.md).
+
 ## Tests
 
 ```bash
@@ -36,4 +41,5 @@ See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## License
 
-[MIT](LICENSE)
+[MIT](LICENSE). `vnc-bridge-wifi` is GPL-3.0-or-later, see
+[LICENSES/GPL-3.0-or-later.txt](LICENSES/GPL-3.0-or-later.txt).
