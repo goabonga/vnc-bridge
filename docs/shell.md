@@ -9,9 +9,26 @@ build/bin/vnc-bridge-shell --connect --socket /path/to/channel.sock
 build/bin/vnc-bridge-shell --connect --runtime-dir /path/to/dir --hostname nano
 ```
 
-`--connect` is required (otherwise the exit status is 2). The program connects with
-a 3-second limit and refuses a peer which runs as another user. Messages are in
-French.
+With `--connect`, the program connects with a 3-second limit and refuses a peer
+which runs as another user. Messages are in French.
+
+## Without --connect
+
+Without `--connect` the program opens a terminal window titled `GPD · shell local RFB`
+that runs itself with `--connect` and the same options:
+
+```sh
+build/bin/vnc-bridge-shell
+build/bin/vnc-bridge-shell --hostname nano
+```
+
+When started without any option, it first asks i3 (`i3-msg`) for a window with that
+title and focuses it if there is one, in which case no terminal is opened.
+
+The terminal is the `terminal` entry of the configuration file (a program name or
+path, started as `terminal -T TITLE -e PROGRAM ...`), else `alacritty`, else `xterm`.
+With none of them, the program prints `Installer alacritty ou xterm, indiquer
+"terminal" dans shell.json, ou utiliser --connect` and exits with status 2.
 
 ## Selecting the channel
 
@@ -34,7 +51,7 @@ The configuration is the optional JSON file `~/.config/vnc-bridge/shell.json`;
 a missing or invalid file is ignored.
 
 ```json
-{"runtime_dir": "/run/user/1000/vnc-bridge", "hostname": "nano"}
+{"runtime_dir": "/run/user/1000/vnc-bridge", "hostname": "nano", "terminal": "alacritty"}
 ```
 
 With zero or several candidates the program prints
