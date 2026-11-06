@@ -14,7 +14,7 @@ body:
     id: version
     attributes:
       label: vnc-bridge version
-      description: "Release tag or commit of vnc-bridge you are running."
+      description: "Output of `vnc-bridge-<program> --version`."
     validations:
       required: true
 
