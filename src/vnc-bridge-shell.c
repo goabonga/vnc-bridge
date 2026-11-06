@@ -400,6 +400,150 @@ static int relay(int fd)
 	return result;
 }
 
+/* ---- launcher: focus the existing window or open a terminal ---- */
+
+static const char title[] = "GPD · shell local RFB";
+
+/* Find the i3 container id of the window titled `title`, 0 if none. */
+static int64_t find_window(J *node)
+{
+	J *window = member(node, "window");
+	if (window &&
+	    !strcmp(text_of(member(member(node, "window_properties"), "title")),
+		    title))
+		return json_object_get_int64(member(node, "id"));
+	static const char *const children[] = {"nodes", "floating_nodes"};
+	for (size_t k = 0; k < sizeof children / sizeof *children; k++) {
+		J *array = member(node, children[k]);
+		if (!array || !json_object_is_type(array, json_type_array))
+			continue;
+		for (size_t i = 0; i < json_object_array_length(array); i++) {
+			int64_t id =
+			    find_window(json_object_array_get_idx(array, i));
+			if (id)
+				return id;
+		}
+	}
+	return 0;
+}
+
+/* Focus the existing shell window with i3-msg; true when i3 reports success. */
+static bool focus_window(void)
+{
+	char *tree_cmd[] = {"i3-msg", "-r", "-t", "get_tree", NULL};
+	char *tree_text = capture(tree_cmd, 2000);
+	if (!tree_text)
+		return false;
+	J *tree = json_tokener_parse(tree_text);
+	free(tree_text);
+	int64_t id = find_window(tree);
+	if (tree)
+		json_object_put(tree);
+	if (!id)
+		return false;
+	char command[128];
+	snprintf(command, sizeof command, "[con_id=%lld] focus", (long long)id);
+	char *focus_cmd[] = {"i3-msg", "-r", command, NULL};
+	char *reply_text = capture(focus_cmd, 2000);
+	if (!reply_text)
+		return false;
+	J *reply = json_tokener_parse(reply_text);
+	free(reply_text);
+	bool ok = false;
+	if (reply && json_object_is_type(reply, json_type_array))
+		for (size_t i = 0; i < json_object_array_length(reply); i++)
+			ok |= json_object_get_boolean(member(
+			    json_object_array_get_idx(reply, i), "success"));
+	if (reply)
+		json_object_put(reply);
+	return ok;
+}
+
+/* Resolve a program name against PATH (names with a slash are used as is). */
+static char *find_program(const char *name)
+{
+	if (strchr(name, '/'))
+		return access(name, X_OK) ? NULL : strdup(name);
+	char *paths = strdup(env_or("PATH", "/usr/bin:/bin"));
+	if (!paths)
+		return NULL;
+	char *save = NULL, *found = NULL;
+	for (char *dir = strtok_r(paths, ":", &save); dir && !found;
+	     dir = strtok_r(NULL, ":", &save)) {
+		char full[PATH_MAX];
+		if (snprintf(full, sizeof full, "%s/%s", dir, name) <
+			(int)sizeof full &&
+		    !access(full, X_OK))
+			found = strdup(full);
+	}
+	free(paths);
+	return found;
+}
+
+/* The terminal of the configuration, else alacritty, else xterm. */
+static char *find_terminal(J *config)
+{
+	J *wanted = member(config, "terminal");
+	char *terminal = NULL;
+	if (wanted && json_object_is_type(wanted, json_type_string) &&
+	    *text_of(wanted))
+		terminal = find_program(text_of(wanted));
+	if (!terminal)
+		terminal = find_program("alacritty");
+	if (!terminal)
+		terminal = find_program("xterm");
+	return terminal;
+}
+
+static J *read_config(void)
+{
+	char path[PATH_MAX];
+	if (snprintf(path, sizeof path, "%s/.config/vnc-bridge/shell.json",
+		     env_or("HOME", "")) >= (int)sizeof path)
+		return NULL;
+	return read_json(path);
+}
+
+/* Without --connect: focus the existing window (when started without any
+ * option) or open a terminal which runs this program with --connect. */
+static int open_terminal(int argc, char **argv)
+{
+	if (argc == 1 && focus_window())
+		return 0;
+	J *config = read_config();
+	char *terminal = find_terminal(config);
+	if (config)
+		json_object_put(config);
+	if (!terminal) {
+		fputs(
+		    "Installer alacritty ou xterm, indiquer \"terminal\" dans "
+		    "shell.json, ou utiliser --connect\n",
+		    stderr);
+		return 2;
+	}
+	char self[PATH_MAX];
+	ssize_t n = readlink("/proc/self/exe", self, sizeof self - 1);
+	char **args = n < 0 ? NULL : calloc((size_t)argc + 7, sizeof *args);
+	if (!args) {
+		free(terminal);
+		return 1;
+	}
+	self[n] = 0;
+	args[0] = terminal;
+	args[1] = "-T";
+	args[2] = (char *)title;
+	args[3] = "-e";
+	args[4] = self;
+	args[5] = "--connect";
+	for (int i = 1; i < argc; i++)
+		args[5 + i] = argv[i];
+	execv(terminal, args);
+	perror(terminal);
+	free(args);
+	free(terminal);
+	return 1;
+}
+
 static int report_failure(void)
 {
 	fputs("\nShell du GPD : connexion fermée ou canal terminal invalide\n",
@@ -449,8 +593,8 @@ int main(int argc, char **argv)
 			return 0;
 		}
 		if (!strcmp(argv[i], "--help")) {
-			puts("Usage: vnc-bridge-shell --connect [--runtime-dir "
-			     "DIR] "
+			puts("Usage: vnc-bridge-shell [--connect] "
+			     "[--runtime-dir DIR] "
 			     "[--hostname HOST] [--client PID:FD] [--socket "
 			     "PATH]");
 			return 0;
@@ -471,14 +615,11 @@ int main(int argc, char **argv)
 		}
 	}
 	if (!connecting)
-		return 2;
+		return open_terminal(argc, argv);
 
-	char config_path[PATH_MAX], default_dir[PATH_MAX], chosen[PATH_MAX];
+	char default_dir[PATH_MAX], chosen[PATH_MAX];
 	J *config = NULL;
-	if (snprintf(config_path, sizeof config_path,
-		     "%s/.config/vnc-bridge/shell.json",
-		     env_or("HOME", "")) < (int)sizeof config_path)
-		config = read_json(config_path);
+	config = read_config();
 	if (!directory && *text_of(member(config, "runtime_dir")))
 		directory = text_of(member(config, "runtime_dir"));
 	if (!hostname && !client && *text_of(member(config, "hostname")))
