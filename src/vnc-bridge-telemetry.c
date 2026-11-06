@@ -2,6 +2,7 @@
 /* Copyright (c) 2026 Chris <goabonga@pm.me> */
 #include "base.h"
 #include "exec.h"
+#include "files.h"
 #include <dirent.h>
 #include <json-c/json.h>
 #include <limits.h>
@@ -29,37 +30,6 @@ static const char *text_of(J *value)
 {
 	const char *s = value ? json_object_get_string(value) : NULL;
 	return s ? s : "";
-}
-
-static char *read_file(const char *path)
-{
-	FILE *f = fopen(path, "r");
-	if (!f)
-		return NULL;
-	size_t cap = 4096, len = 0;
-	char *data = malloc(cap);
-	size_t n;
-	while (data && (n = fread(data + len, 1, cap - len - 1, f)) > 0) {
-		len += n;
-		if (len > 4 * 1024 * 1024) {
-			free(data);
-			data = NULL;
-			break;
-		}
-		if (len + 1 >= cap) {
-			char *bigger = realloc(data, cap *= 2);
-			if (!bigger) {
-				free(data);
-				data = NULL;
-			} else {
-				data = bigger;
-			}
-		}
-	}
-	fclose(f);
-	if (data)
-		data[len] = 0;
-	return data;
 }
 
 static void print_battery(int percent, bool charging)
