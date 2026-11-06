@@ -57,8 +57,8 @@ Releases are automated. A push to `main` starts a strictly ordered
 pipeline: `resign-main` (re-signs unsigned commits), then `ci`, then
 `release`, each starting when the previous one completed. The `release`
 workflow runs `multicz bump` (signed commit and tag), creates the
-GitHub release. Maintainers do
-not bump versions or edit the changelog by hand.
+GitHub release and attaches the binaries built on Arch Linux. Maintainers
+do not bump versions or edit the changelog by hand.
 
 ## Reporting bugs and asking for features
 
