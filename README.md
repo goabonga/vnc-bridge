@@ -19,6 +19,8 @@ make install    # under $(PREFIX)/bin, default /usr/local, honouring DESTDIR
 
 - `vnc-bridge-i3blocks`: runs `i3blocks` with alternating Solarized
   backgrounds, see [docs/i3blocks.md](docs/i3blocks.md).
+- `vnc-bridge-telemetry`: prints battery and volume blocks from client
+  measurements, see [docs/telemetry.md](docs/telemetry.md).
 - `vnc-bridge-wifi`: i3blocks block showing Wi-Fi signal strength, see
   [docs/wifi.md](docs/wifi.md).
 
