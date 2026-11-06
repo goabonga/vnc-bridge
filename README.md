@@ -8,6 +8,8 @@ Native C11 companion utilities for TigerVNC on Arch Linux.
 
 ## Build
 
+Building requires `json-c` and `pkgconf`.
+
 ```bash
 make build      # binaries are written to build/bin/
 make install    # under $(PREFIX)/bin, default /usr/local, honouring DESTDIR
@@ -15,6 +17,8 @@ make install    # under $(PREFIX)/bin, default /usr/local, honouring DESTDIR
 
 ## Programs
 
+- `vnc-bridge-i3blocks`: runs `i3blocks` with alternating Solarized
+  backgrounds, see [docs/i3blocks.md](docs/i3blocks.md).
 - `vnc-bridge-wifi`: i3blocks block showing Wi-Fi signal strength, see
   [docs/wifi.md](docs/wifi.md).
 

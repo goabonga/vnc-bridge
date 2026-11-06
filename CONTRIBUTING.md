@@ -11,8 +11,8 @@ its terms.
 
 ## Development setup
 
-You need a C11 compiler (gcc or clang), `make`, `clang-format` and
-`clang-tidy`.
+You need a C11 compiler (gcc or clang), `make`, `pkgconf`, `json-c`,
+`clang-format` and `clang-tidy`.
 
 ```bash
 git clone https://github.com/goabonga/vnc-bridge.git
