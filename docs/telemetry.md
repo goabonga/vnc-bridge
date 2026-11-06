@@ -17,6 +17,7 @@ build/bin/vnc-bridge-telemetry status --runtime-dir /path/to/dir
 | `battery` | `BAT 73% (host)`, with `+` after the percentage while charging |
 | `audio` | `VOL 65%`, or `VOL MUET` when muted |
 | `status` | The content of `status.json`, unchanged |
+| `local-battery` | Battery of the local machine, in the `--i3blocks` format |
 
 ## Options
 
@@ -51,6 +52,16 @@ while charging. The battery icon changes at 10, 35, 65 and 90 percent.
 text and color. The speaker icon has three levels (up to 25%, up to 65%, above)
 and a muted volume uses the lowest icon with the color `#586e75`; otherwise the
 color is `#fc9600`.
+
+## Local battery
+
+`local-battery` needs no runtime directory and reads
+`/sys/class/power_supply`. The first battery in name order that is present
+(`present` is not `0`) and has an integer `capacity` from 0 to 100 is printed
+in the `battery --i3blocks` format; an empty line is printed when there is none.
+A `status` of `Charging` shows the bolt. When the battery reports `Unknown`, the
+first `USB` or `Mains` supply with the status `Charging`, `Discharging` or
+`Not charging` decides.
 
 ## Exit status
 
