@@ -200,13 +200,12 @@ static int choose(char *out, size_t size, const char *directory,
 	if (root)
 		json_object_put(root);
 	if (found != 1) {
-		fputs(
-		    found
-			? "Plusieurs viewers disponibles ; préciser --client "
-			  "PID:FD\n"
-			: "Aucun canal RFB du GPD disponible. Activer "
-			  "VNC_BRIDGE_SHELL=1 dans le viewer et reconnecter.\n",
-		    stderr);
+		fputs(found
+			  ? "Several viewers available; specify --client "
+			    "PID:FD\n"
+			  : "No RFB channel from the GPD available. Enable "
+			    "VNC_BRIDGE_SHELL=1 in the viewer and reconnect.\n",
+		      stderr);
 		return -1;
 	}
 	return 0;
@@ -275,7 +274,7 @@ static bool receive_frames(struct buffer *incoming, struct buffer *output,
 		} else if (kind == 'E' && len == 1) {
 			*exit_code = incoming->data[3];
 			if (*exit_code == 125) {
-				fputs("Un terminal est déjà ouvert pour ce "
+				fputs("A terminal is already open for this "
 				      "viewer\n",
 				      stderr);
 				return false;
@@ -402,7 +401,7 @@ static int relay(int fd)
 
 /* ---- launcher: focus the existing window or open a terminal ---- */
 
-static const char title[] = "GPD · shell local RFB";
+static const char title[] = "GPD · local RFB shell";
 
 /* Find the i3 container id of the window titled `title`, 0 if none. */
 static int64_t find_window(J *node)
@@ -515,10 +514,9 @@ static int open_terminal(int argc, char **argv)
 	if (config)
 		json_object_put(config);
 	if (!terminal) {
-		fputs(
-		    "Installer alacritty ou xterm, indiquer \"terminal\" dans "
-		    "shell.json, ou utiliser --connect\n",
-		    stderr);
+		fputs("Install alacritty or xterm, set \"terminal\" in "
+		      "shell.json, or use --connect\n",
+		      stderr);
 		return 2;
 	}
 	char self[PATH_MAX];
@@ -546,7 +544,7 @@ static int open_terminal(int argc, char **argv)
 
 static int report_failure(void)
 {
-	fputs("\nShell du GPD : connexion fermée ou canal terminal invalide\n",
+	fputs("\nGPD shell: connection closed or invalid terminal channel\n",
 	      stderr);
 	return 1;
 }

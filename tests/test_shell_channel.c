@@ -176,9 +176,7 @@ static void test_already_open(void)
 	send_bytes(p.fd, "E\0\1}", 4);
 	char err[512] = "";
 	read_available(p.child.err, err, sizeof err, 3000);
-	CHECK(strstr(
-		  err,
-		  "Un terminal est d\xc3\xa9j\xc3\xa0 ouvert pour ce viewer") !=
+	CHECK(strstr(err, "A terminal is already open for this viewer") !=
 	      NULL);
 	finish_peer(&p, 1);
 }
@@ -267,8 +265,7 @@ static void test_unreachable(void)
 	child_process c = spawn_child(argv);
 	char err[512] = "";
 	read_available(c.err, err, sizeof err, 3000);
-	CHECK(strstr(err, "connexion ferm\xc3\xa9"
-			  "e") != NULL);
+	CHECK(strstr(err, "connection closed") != NULL);
 	CHECK(reap_child(&c, 3000) == 1);
 }
 
