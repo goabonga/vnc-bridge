@@ -93,6 +93,33 @@ jobs:
           JOB_STATUS: ${{ job.status }}
         run: scripts/summary.sh "lint (clang-format, clang-tidy)" "$JOB_STATUS" --file lint.txt
 
+  test:
+    name: test
+    needs: [gate]
+    if: needs.gate.outputs.go == 'true'
+    runs-on: ubuntu-24.04
+    container: archlinux:base-devel
+    steps:
+      - name: Install the toolchain
+        run: pacman -Syu --noconfirm --needed clang git
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+          persist-credentials: false
+      - name: Unit tests with gcc and clang (ASan, UBSan)
+        shell: bash
+        run: |
+          for cc in gcc clang; do
+            echo "== ${cc}"
+            make clean
+            make test CC="$cc"
+          done 2>&1 | tee test.txt
+      - name: Summary
+        if: always()
+        env:
+          JOB_STATUS: ${{ job.status }}
+        run: scripts/summary.sh "tests on Arch Linux (gcc, clang)" "$JOB_STATUS" --file test.txt
+
   workflows:
     name: workflows
     needs: [gate]
