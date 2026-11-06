@@ -1,12 +1,12 @@
 {
   "version": 1,
-  "git_head": "14b417f047e774ce380110b14d2de14ffe9d21df",
-  "git_head_short": "14b417f",
-  "timestamp": "2026-11-06T09:46:50Z",
+  "git_head": "cf1e9f0408975af5d59c8d1580b1f2cd322adfaf",
+  "git_head_short": "cf1e9f0",
+  "timestamp": "2026-11-06T11:51:21Z",
   "components": {
     "vnc-bridge": {
-      "version": "0.1.0",
-      "tag": "v0.1.0",
+      "version": "0.1.1",
+      "tag": "v0.1.1",
       "tag_sha": null
     }
   }
