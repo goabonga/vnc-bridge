@@ -10,11 +10,11 @@ build/bin/vnc-bridge-shell --connect --runtime-dir /path/to/dir --hostname nano
 ```
 
 With `--connect`, the program connects with a 3-second limit and refuses a peer
-which runs as another user. Messages are in French.
+which runs as another user. Messages are in English.
 
 ## Without --connect
 
-Without `--connect` the program opens a terminal window titled `GPD · shell local RFB`
+Without `--connect` the program opens a terminal window titled `GPD · local RFB shell`
 that runs itself with `--connect` and the same options:
 
 ```sh
@@ -27,8 +27,8 @@ title and focuses it if there is one, in which case no terminal is opened.
 
 The terminal is the `terminal` entry of the configuration file (a program name or
 path, started as `terminal -T TITLE -e PROGRAM ...`), else `alacritty`, else `xterm`.
-With none of them, the program prints `Installer alacritty ou xterm, indiquer
-"terminal" dans shell.json, ou utiliser --connect` and exits with status 2.
+With none of them, the program prints `Install alacritty or xterm, set
+"terminal" in shell.json, or use --connect` and exits with status 2.
 
 ## Selecting the channel
 
@@ -55,8 +55,8 @@ a missing or invalid file is ignored.
 ```
 
 With zero or several candidates the program prints
-`Aucun canal RFB du GPD disponible. Activer VNC_BRIDGE_SHELL=1 dans le viewer et reconnecter.`
-or `Plusieurs viewers disponibles ; préciser --client PID:FD`, then the failure message
+`No RFB channel from the GPD available. Enable VNC_BRIDGE_SHELL=1 in the viewer and reconnect.`
+or `Several viewers available; specify --client PID:FD`, then the failure message
 below, and exits with status 1.
 
 ## Terminal handling
@@ -84,10 +84,10 @@ End of standard input is sent as a `D` frame holding the byte `0x04`.
 
 The exit status is the byte of the `E` frame, once all received output has been
 written. It is 128 plus the signal number after `SIGINT`, `SIGTERM` or `SIGHUP`.
-It is 1, after printing `Shell du GPD : connexion fermée ou canal terminal invalide`,
+It is 1, after printing `GPD shell: connection closed or invalid terminal channel`,
 when the channel cannot be reached, closes without an `E` frame, or sends an
 oversized, unknown or malformed frame. An `E` frame holding 125 means a terminal is
-already open: the program prints `Un terminal est déjà ouvert pour ce viewer` and
+already open: the program prints `A terminal is already open for this viewer` and
 exits with status 1.
 
 `vnc-bridge-shell --help` prints the usage and `--version` the version.
