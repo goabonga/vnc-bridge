@@ -17,6 +17,8 @@ make install    # under $(PREFIX)/bin, default /usr/local, honouring DESTDIR
 
 ## Programs
 
+- `vnc-bridge-fido`: lists USB FIDO authenticators and exports one over a
+  binary stream, see [docs/fido.md](docs/fido.md).
 - `vnc-bridge-i3blocks`: runs `i3blocks` with alternating Solarized
   backgrounds, see [docs/i3blocks.md](docs/i3blocks.md).
 - `vnc-bridge-pcsc`: lists PC/SC channel sockets and runs a program using
