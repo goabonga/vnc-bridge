@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: MIT */
 /* Copyright (c) 2026 Chris <goabonga@pm.me> */
 #include "base.h"
+#include "exec.h"
 #include "fido.h"
 #include <ctype.h>
 #include <errno.h>
@@ -16,7 +17,9 @@
 #include <string.h>
 #include <sys/file.h>
 #include <sys/ioctl.h>
+#include <sys/random.h>
 #include <sys/stat.h>
+#include <time.h>
 #include <unistd.h>
 
 static volatile sig_atomic_t stopping;
@@ -253,6 +256,42 @@ static int export_reports(int device, const struct hidraw_devinfo *info)
 	return 0;
 }
 
+/* Send a CTAPHID_INIT request on the broadcast channel and check the answer.
+ * INIT only negotiates a channel: it never registers or signs anything. */
+static int probe(int fd, int timeout_ms)
+{
+	unsigned char packet[FIDO_PACKET + 1] = {0}, nonce[8];
+	if (getrandom(nonce, sizeof nonce, 0) != (ssize_t)sizeof nonce)
+		return 1;
+	memset(packet + 1, 255, 4);
+	packet[5] = 0x86;
+	packet[7] = sizeof nonce;
+	memcpy(packet + 8, nonce, sizeof nonce);
+	if (write(fd, packet, sizeof packet) != (ssize_t)sizeof packet)
+		return 1;
+	double deadline = clocksec(CLOCK_MONOTONIC) + timeout_ms / 1000.;
+	while (clocksec(CLOCK_MONOTONIC) < deadline) {
+		struct pollfd p = {fd, POLLIN, 0};
+		if (poll(&p, 1, 100) < 0 && errno != EINTR)
+			break;
+		unsigned char response[FIDO_PACKET + 1];
+		ssize_t n = read(fd, response, sizeof response);
+		if (n == FIDO_PACKET && !memcmp(response, packet + 1, 4) &&
+		    response[4] == 0x86 && response[5] == 0 &&
+		    response[6] == 17 &&
+		    !memcmp(response + 7, nonce, sizeof nonce)) {
+			printf("CTAPHID_INIT OK; HID framing=%u; "
+			       "capabilities=0x%02x\n",
+			       response[19], response[23]);
+			return 0;
+		}
+		if (n < 0 && errno != EAGAIN && errno != EINTR)
+			break;
+	}
+	fputs("FIDO INIT timed out\n", stderr);
+	return 1;
+}
+
 int main(int argc, char **argv)
 {
 	struct sigaction action = {.sa_handler = stop};
@@ -266,6 +305,7 @@ int main(int argc, char **argv)
 	}
 	if (argc < 2 || !strcmp(argv[1], "--help")) {
 		puts("Usage: vnc-bridge-fido list\n"
+		     "       vnc-bridge-fido probe --device /dev/hidrawN\n"
 		     "       vnc-bridge-fido export --device /dev/hidrawN "
 		     "(binary stdio)");
 		return argc < 2 ? 2 : 0;
@@ -282,7 +322,9 @@ int main(int argc, char **argv)
 		else
 			return 2;
 	}
-	if (strcmp(argv[1], "export") != 0 || !device || isatty(0) || isatty(1))
+	bool exporting = !strcmp(argv[1], "export");
+	if ((!exporting && strcmp(argv[1], "probe") != 0) || !device ||
+	    (exporting && (isatty(0) || isatty(1))))
 		return 2;
 	struct hidraw_devinfo info;
 	int fd = read_device(device, &info, true);
@@ -297,7 +339,7 @@ int main(int argc, char **argv)
 		close(fd);
 		return 1;
 	}
-	int result = export_reports(fd, &info);
+	int result = exporting ? export_reports(fd, &info) : probe(fd, 3000);
 	close(fd);
 	return result;
 }
