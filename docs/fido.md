@@ -1,13 +1,15 @@
 # vnc-bridge-fido
 
-Lists USB FIDO authenticators, checks that one answers, and exports one of them
-over standard input and output with a small binary protocol.
+Lists USB FIDO authenticators, checks that one answers, exports one of them over
+standard input and output with a small binary protocol, and attaches such a stream
+to a virtual device with UHID.
 
 ```sh
 make build
 build/bin/vnc-bridge-fido list
 build/bin/vnc-bridge-fido probe --device /dev/hidraw3
 build/bin/vnc-bridge-fido export --device /dev/hidraw3
+build/bin/vnc-bridge-fido attach --socket /private/dir/PID-FD.sock
 ```
 
 ## list
@@ -59,3 +61,32 @@ program with status 1. End of input on a frame boundary, `SIGTERM`, `SIGINT` and
 `SIGHUP` end it with status 0. Report contents are never logged.
 
 `vnc-bridge-fido --help` prints the usage and `--version` the version.
+
+## attach
+
+`attach` creates a virtual FIDO device from a stream of the protocol above and
+relays the host's reports back. It opens `/dev/uhid` first (the current user needs
+access to it), then connects to a channel socket:
+
+| Option | Effect |
+| --- | --- |
+| `--socket PATH` | Connect to this socket |
+| `--runtime-dir DIR` | Look for `DIR/fido/PID-FD.sock`; default `$XDG_RUNTIME_DIR/vnc-bridge` |
+| `--client PID:FD` | Select the socket of this identifier |
+
+`--socket` excludes the two other options. Without it, exactly one socket of a
+running process must match, otherwise the exit status is 1. The socket must be
+owned by the current user and not accessible to others, in a directory with the same
+properties and without a symbolic link, and its peer must be the same user.
+
+Only the canonical FIDO device is ever created: a 64-byte input report and a
+64-byte output report on usage page `0xF1D0`, named `vnc-bridge remote FIDO`, with the
+vendor and product ids of the `I` frame. The device is created by the first `I` frame;
+a `D` frame before it, a second `I` frame, an unknown or oversized frame, or an `E`
+frame (one-byte error code, 125 meaning the device is already attached) ends the
+program with status 1. Input reports come from `D` frames; output reports (with or
+without a leading zero report id) and `SET_REPORT` output requests go back as `D`
+frames. Feature requests are answered with an error and never forwarded.
+
+When the channel closes or fails, the virtual device is destroyed and the status is 1.
+`SIGTERM`, `SIGINT` and `SIGHUP` end the program with status 0.
