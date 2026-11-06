@@ -9,3 +9,7 @@ make format-check   # clang-format
 make lint           # clang-tidy
 make format         # apply clang-format
 ```
+
+## License
+
+[MIT](LICENSE)
