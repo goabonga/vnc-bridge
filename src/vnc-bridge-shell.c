@@ -2,12 +2,19 @@
 /* Copyright (c) 2026 Chris <goabonga@pm.me> */
 #include "base.h"
 #include "exec.h"
+#include "files.h"
+#include <dirent.h>
+#include <json-c/json.h>
+#include <limits.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <sys/ioctl.h>
 #include <sys/socket.h>
+#include <sys/stat.h>
 #include <sys/un.h>
 #include <termios.h>
+
+typedef struct json_object J;
 
 #define BUFFER 131072
 #define MAX_PAYLOAD 55
@@ -82,6 +89,133 @@ static int flush_fd(int fd, struct buffer *b)
 		return 0;
 	}
 	return n < 0 && (errno == EAGAIN || errno == EINTR) ? 0 : -1;
+}
+
+/* ---- channel selection ---- */
+
+static J *member(J *object, const char *key)
+{
+	J *value = NULL;
+	if (object)
+		json_object_object_get_ex(object, key, &value);
+	return value;
+}
+
+static const char *text_of(J *value)
+{
+	const char *s = value ? json_object_get_string(value) : NULL;
+	return s ? s : "";
+}
+
+static J *read_json(const char *path)
+{
+	char *text = read_file(path);
+	J *value = text ? json_tokener_parse(text) : NULL;
+	free(text);
+	return value;
+}
+
+/* Does status.json describe a client with this "PID-FD" stem and hostname? */
+static bool client_has_hostname(J *records, const char *stem,
+				const char *hostname)
+{
+	if (!records || !json_object_is_type(records, json_type_array))
+		return false;
+	for (size_t i = 0; i < json_object_array_length(records); i++) {
+		J *record = json_object_array_get_idx(records, i);
+		char id[128];
+		snprintf(id, sizeof id, "%s", text_of(member(record, "id")));
+		for (char *p = id; *p; p++)
+			if (*p == ':')
+				*p = '-';
+		if (!strcmp(id, stem) &&
+		    !strcmp(hostname, text_of(member(record, "hostname"))))
+			return true;
+	}
+	return false;
+}
+
+/* Is `name` a "PID-FD.sock" file of a running process? Fills stem. */
+static bool live_channel_name(const char *name, char *stem, size_t size)
+{
+	size_t len = strlen(name);
+	if (len < 6 || strcmp(name + len - 5, ".sock") != 0 || len - 5 >= size)
+		return false;
+	memcpy(stem, name, len - 5);
+	stem[len - 5] = 0;
+	char *end;
+	errno = 0;
+	long pid = strtol(stem, &end, 10);
+	return !errno && end != stem && *end == '-' && pid > 0 &&
+	       pid <= INT_MAX && !kill((pid_t)pid, 0);
+}
+
+/* Pick the single <directory>/shell/PID-FD.sock of a running process owned by
+ * the current user, optionally restricted to a client "PID:FD" or to the
+ * hostname recorded in status.json. */
+static int choose(char *out, size_t size, const char *directory,
+		  const char *hostname, const char *client)
+{
+	char path[PATH_MAX], wanted[128] = "";
+	if (client) {
+		if (snprintf(wanted, sizeof wanted, "%s", client) >=
+		    (int)sizeof wanted)
+			return -1;
+		for (char *p = wanted; *p; p++)
+			if (*p == ':')
+				*p = '-';
+	}
+	if (snprintf(path, sizeof path, "%s/status.json", directory) >=
+	    (int)sizeof path)
+		return -1;
+	J *root = read_json(path);
+	J *records = member(root, "clients");
+	if (snprintf(path, sizeof path, "%s/shell", directory) >=
+	    (int)sizeof path) {
+		if (root)
+			json_object_put(root);
+		return -1;
+	}
+	struct dirent **list = NULL;
+	int count = scandir(path, &list, NULL, alphasort), found = 0;
+	for (int i = 0; i < count; i++) {
+		char stem[256], full[PATH_MAX];
+		struct stat st;
+		if (!live_channel_name(list[i]->d_name, stem, sizeof stem) ||
+		    (client && strcmp(stem, wanted) != 0) ||
+		    snprintf(full, sizeof full, "%s/%s", path,
+			     list[i]->d_name) >= (int)sizeof full ||
+		    lstat(full, &st) || !S_ISSOCK(st.st_mode) ||
+		    st.st_uid != getuid() ||
+		    (hostname &&
+		     !client_has_hostname(records, stem, hostname)) ||
+		    snprintf(out, size, "%s", full) >= (int)size)
+			continue;
+		found++;
+	}
+	for (int i = 0; i < count; i++)
+		free(list[i]);
+	if (count >= 0)
+		free(list);
+	if (root)
+		json_object_put(root);
+	if (found != 1) {
+		fputs(
+		    found
+			? "Plusieurs viewers disponibles ; préciser --client "
+			  "PID:FD\n"
+			: "Aucun canal RFB du GPD disponible. Activer "
+			  "VNC_BRIDGE_SHELL=1 dans le viewer et reconnecter.\n",
+		    stderr);
+		return -1;
+	}
+	return 0;
+}
+
+static const char *env_or(const char *name, const char *fallback)
+{
+	const char *value = getenv(name);
+	return value ? value : fallback;
 }
 
 /* ---- channel ---- */
@@ -266,37 +400,69 @@ static int relay(int fd)
 	return result;
 }
 
+static int report_failure(void)
+{
+	fputs("\nShell du GPD : connexion fermée ou canal terminal invalide\n",
+	      stderr);
+	return 1;
+}
+
 static int run_channel(const char *path)
 {
 	int fd = connect_channel(path);
 	int rc = fd < 0 ? -1 : relay(fd);
 	if (fd >= 0)
 		close(fd);
-	if (rc < 0) {
-		fputs("\nShell du GPD : connexion fermée ou canal terminal "
-		      "invalide\n",
-		      stderr);
-		return 1;
+	return rc < 0 ? report_failure() : rc;
+}
+
+/* Runtime directory: option, configuration, directory of VNC_BRIDGE_SOCKET,
+ * then $XDG_RUNTIME_DIR/vnc-bridge. */
+static bool default_directory(char *out, size_t size)
+{
+	const char *configured = getenv("VNC_BRIDGE_SOCKET");
+	if (configured && configured[0] == '/') {
+		snprintf(out, size, "%s", configured);
+		char *slash = strrchr(out, '/');
+		if (slash == out)
+			slash[1] = 0;
+		else
+			*slash = 0;
+		return true;
 	}
-	return rc;
+	char fallback[64];
+	snprintf(fallback, sizeof fallback, "/run/user/%lu",
+		 (unsigned long)getuid());
+	return snprintf(out, size, "%s/vnc-bridge",
+			env_or("XDG_RUNTIME_DIR", fallback)) < (int)size;
 }
 
 int main(int argc, char **argv)
 {
 	signal(SIGPIPE, SIG_IGN);
 	bool connecting = false;
-	const char *socket_path = NULL;
+	const char *directory = NULL, *hostname = NULL, *client = NULL,
+		   *socket_path = NULL;
 	for (int i = 1; i < argc; i++) {
 		if (!strcmp(argv[i], "--version")) {
 			puts(BASE_VERSION);
 			return 0;
 		}
 		if (!strcmp(argv[i], "--help")) {
-			puts("Usage: vnc-bridge-shell --connect --socket PATH");
+			puts("Usage: vnc-bridge-shell --connect [--runtime-dir "
+			     "DIR] "
+			     "[--hostname HOST] [--client PID:FD] [--socket "
+			     "PATH]");
 			return 0;
 		}
 		if (!strcmp(argv[i], "--connect"))
 			connecting = true;
+		else if (!strcmp(argv[i], "--runtime-dir") && i + 1 < argc)
+			directory = argv[++i];
+		else if (!strcmp(argv[i], "--hostname") && i + 1 < argc)
+			hostname = argv[++i];
+		else if (!strcmp(argv[i], "--client") && i + 1 < argc)
+			client = argv[++i];
 		else if (!strcmp(argv[i], "--socket") && i + 1 < argc)
 			socket_path = argv[++i];
 		else {
@@ -304,7 +470,35 @@ int main(int argc, char **argv)
 			return 2;
 		}
 	}
-	if (!connecting || !socket_path)
+	if (!connecting)
 		return 2;
-	return run_channel(socket_path);
+
+	char config_path[PATH_MAX], default_dir[PATH_MAX], chosen[PATH_MAX];
+	J *config = NULL;
+	if (snprintf(config_path, sizeof config_path,
+		     "%s/.config/vnc-bridge/shell.json",
+		     env_or("HOME", "")) < (int)sizeof config_path)
+		config = read_json(config_path);
+	if (!directory && *text_of(member(config, "runtime_dir")))
+		directory = text_of(member(config, "runtime_dir"));
+	if (!hostname && !client && *text_of(member(config, "hostname")))
+		hostname = text_of(member(config, "hostname"));
+	if (!directory) {
+		if (!default_directory(default_dir, sizeof default_dir)) {
+			if (config)
+				json_object_put(config);
+			return 1;
+		}
+		directory = default_dir;
+	}
+	int rc;
+	if (socket_path)
+		rc = run_channel(socket_path);
+	else if (!choose(chosen, sizeof chosen, directory, hostname, client))
+		rc = run_channel(chosen);
+	else
+		rc = report_failure();
+	if (config)
+		json_object_put(config);
+	return rc;
 }
