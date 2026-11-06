@@ -2,6 +2,7 @@
 /* Copyright (c) 2026 Chris <goabonga@pm.me> */
 #include "base.h"
 #include "exec.h"
+#include <dirent.h>
 #include <json-c/json.h>
 #include <limits.h>
 #include <stdio.h>
@@ -73,6 +74,94 @@ static void print_audio(int percent, bool muted)
 	char text[128];
 	snprintf(text, sizeof text, " %3d%% %s ", percent, icon);
 	printf("%s\n%s\n%s\n", text, text, muted ? "#586e75" : "#fc9600");
+}
+
+static char *supply_field(const char *root, const char *device, const char *key)
+{
+	char path[PATH_MAX];
+	if (snprintf(path, sizeof path, "%s/%s/%s", root, device, key) >=
+	    (int)sizeof path)
+		return NULL;
+	char *value = read_file(path);
+	if (value)
+		trim(value);
+	return value;
+}
+
+static bool supply_field_is(const char *root, const char *device,
+			    const char *key, const char *expected)
+{
+	char *value = supply_field(root, device, key);
+	bool same = value && !strcmp(value, expected);
+	free(value);
+	return same;
+}
+
+static bool parse_percent(const char *text, int *value)
+{
+	if (!text || !*text)
+		return false;
+	char *end;
+	errno = 0;
+	long n = strtol(text, &end, 10);
+	if (errno || *end || n < 0 || n > 100)
+		return false;
+	*value = (int)n;
+	return true;
+}
+
+/* Charging state of the first external supply reporting a known status. */
+static bool external_supply_charging(struct dirent **list, int count,
+				     const char *root)
+{
+	for (int i = 0; i < count; i++) {
+		const char *device = list[i]->d_name;
+		if (!supply_field_is(root, device, "type", "USB") &&
+		    !supply_field_is(root, device, "type", "Mains"))
+			continue;
+		char *state = supply_field(root, device, "status");
+		bool known = state && (!strcmp(state, "Charging") ||
+				       !strcmp(state, "Discharging") ||
+				       !strcmp(state, "Not charging"));
+		bool charging = known && !strcmp(state, "Charging");
+		free(state);
+		if (known)
+			return charging;
+	}
+	return false;
+}
+
+/* Print the block of the first present battery with a valid capacity. */
+static void local_battery(const char *root)
+{
+	struct dirent **list = NULL;
+	int count = scandir(root, &list, NULL, alphasort);
+	bool found = false;
+	for (int i = 0; i < count && !found; i++) {
+		const char *device = list[i]->d_name;
+		if (!supply_field_is(root, device, "type", "Battery") ||
+		    supply_field_is(root, device, "present", "0"))
+			continue;
+		char *capacity = supply_field(root, device, "capacity");
+		int percent;
+		bool valid = parse_percent(capacity, &percent);
+		free(capacity);
+		if (!valid)
+			continue;
+		char *state = supply_field(root, device, "status");
+		bool charging = state && !strcmp(state, "Charging");
+		if (state && !strcmp(state, "Unknown"))
+			charging = external_supply_charging(list, count, root);
+		free(state);
+		print_battery(percent, charging);
+		found = true;
+	}
+	for (int i = 0; i < count; i++)
+		free(list[i]);
+	if (count >= 0)
+		free(list);
+	if (!found)
+		puts("");
 }
 
 typedef struct {
@@ -161,7 +250,7 @@ int main(int argc, char **argv)
 		}
 		if (!strcmp(argv[i], "--help")) {
 			puts("Usage: vnc-bridge-telemetry "
-			     "{battery,audio,status} "
+			     "{battery,audio,status,local-battery} "
 			     "[--runtime-dir DIR] [--hostname HOST] [--client "
 			     "PID:FD] "
 			     "[--hide-unavailable] [--i3blocks]");
@@ -186,6 +275,10 @@ int main(int argc, char **argv)
 	}
 	if (!command)
 		return 2;
+	if (!strcmp(command, "local-battery")) {
+		local_battery("/sys/class/power_supply");
+		return 0;
+	}
 	bool battery = !strcmp(command, "battery");
 	bool sound = !strcmp(command, "audio");
 	bool status = !strcmp(command, "status");
