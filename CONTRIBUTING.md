@@ -27,6 +27,7 @@ runs:
 ```bash
 make format-check
 make lint
+make test
 uv tool run multicz validate --strict
 ```
 

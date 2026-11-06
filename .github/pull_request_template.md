@@ -10,6 +10,7 @@
 - [ ] `fix` - Bug fix
 - [ ] `docs` - Documentation
 - [ ] `refactor` - Code refactoring
+- [ ] `test` - Adding or updating tests
 - [ ] `chore` - Maintenance
 - [ ] `ci` - CI / release pipeline
 
@@ -21,6 +22,6 @@
 
 - [ ] Commits follow [Conventional Commits](https://www.conventionalcommits.org/)
 - [ ] Branch is up to date with `main`
-- [ ] `make format-check` and `make lint` pass
+- [ ] `make format-check`, `make lint` and `make test` pass
 - [ ] `uv tool run multicz validate --strict` passes
 - [ ] No `Co-Authored-By` trailer in commit messages
