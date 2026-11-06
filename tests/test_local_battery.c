@@ -8,7 +8,7 @@
 #include <ftw.h>
 #include <sys/stat.h>
 
-static char root[] = "/tmp/tvx-power-XXXXXX";
+static char root[] = "/tmp/vncb-power-XXXXXX";
 
 static void put(const char *device, const char *key, const char *value)
 {

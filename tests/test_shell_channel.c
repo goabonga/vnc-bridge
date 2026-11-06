@@ -12,7 +12,7 @@
 
 #define SHELL "build/bin/vnc-bridge-shell"
 
-static char root[] = "/tmp/tvx-shell-XXXXXX";
+static char root[] = "/tmp/vncb-shell-XXXXXX";
 static char socket_path[300];
 static int server;
 
@@ -263,7 +263,7 @@ static void test_terminal(void)
 static void test_unreachable(void)
 {
 	char *argv[] = {SHELL, "--connect", "--socket",
-			"/tmp/tvx-no-such-socket", NULL};
+			"/tmp/vncb-no-such-socket", NULL};
 	child_process c = spawn_child(argv);
 	char err[512] = "";
 	read_available(c.err, err, sizeof err, 3000);

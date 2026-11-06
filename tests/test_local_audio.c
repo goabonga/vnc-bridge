@@ -8,7 +8,7 @@
 #include <ftw.h>
 #include <sys/stat.h>
 
-static char dir[] = "/tmp/tvx-audio-XXXXXX";
+static char dir[] = "/tmp/vncb-audio-XXXXXX";
 static char cards[300];
 static char arguments[300];
 static char full_path[2048];

@@ -158,7 +158,7 @@ static inline int reap_child(child_process *c, int timeout_ms)
  * printed (malloc'd), or NULL when the capture failed. */
 static inline char *capture_stdout_of(void (*fn)(const char *), const char *arg)
 {
-	char path[] = "/tmp/tvx-stdout-XXXXXX";
+	char path[] = "/tmp/vncb-stdout-XXXXXX";
 	int fd = mkstemp(path);
 	if (fd < 0)
 		return NULL;

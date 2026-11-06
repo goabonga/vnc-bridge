@@ -6,7 +6,7 @@
 #include <stdarg.h>
 #include <time.h>
 
-static char dir[] = "/tmp/tvx-telemetry-XXXXXX";
+static char dir[] = "/tmp/vncb-telemetry-XXXXXX";
 static char status_path[256];
 
 static void put_status(const char *clients_fmt, ...)

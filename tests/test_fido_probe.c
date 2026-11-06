@@ -75,7 +75,7 @@ static void run_probe(enum behavior how, int want, const char *printed_text)
 	int result = -1;
 	char *out = NULL;
 	{
-		char path[] = "/tmp/tvx-probe-XXXXXX";
+		char path[] = "/tmp/vncb-probe-XXXXXX";
 		int file = mkstemp(path);
 		fflush(stdout);
 		int saved = dup(1);

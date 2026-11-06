@@ -10,7 +10,7 @@
 #include <sys/stat.h>
 #include <sys/un.h>
 
-static char base[] = "/tmp/tvx-daemon-XXXXXX";
+static char base[] = "/tmp/vncb-daemon-XXXXXX";
 
 /* ---- decoding and expiry, without a process ---- */
 

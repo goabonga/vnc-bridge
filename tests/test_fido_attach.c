@@ -273,7 +273,7 @@ static void test_control_requests(void)
 
 /* ---- channel selection and connection ---- */
 
-static char root[] = "/tmp/tvx-attach-XXXXXX";
+static char root[] = "/tmp/vncb-attach-XXXXXX";
 static int listeners[8];
 static int open_listeners;
 

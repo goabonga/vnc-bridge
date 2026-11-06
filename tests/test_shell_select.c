@@ -9,7 +9,7 @@
 
 #define SHELL "build/bin/vnc-bridge-shell"
 
-static char root[] = "/tmp/tvx-select-XXXXXX";
+static char root[] = "/tmp/vncb-select-XXXXXX";
 static char runtime[300];
 static int servers[8];
 static int open_servers;

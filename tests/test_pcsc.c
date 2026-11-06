@@ -10,7 +10,7 @@
 
 #define PCSC "build/bin/vnc-bridge-pcsc"
 
-static char root[] = "/tmp/tvx-pcsc-XXXXXX";
+static char root[] = "/tmp/vncb-pcsc-XXXXXX";
 static int sockets[8];
 static int open_sockets;
 

@@ -73,7 +73,7 @@ static void test_decorate(void)
 
 static void test_stream(void)
 {
-	char dir[] = "/tmp/tvx-i3blocks-XXXXXX";
+	char dir[] = "/tmp/vncb-i3blocks-XXXXXX";
 	CHECK(mkdtemp(dir) != NULL);
 	char fake[256], click[256], input[256], path[1024];
 	snprintf(fake, sizeof fake, "%s/i3blocks", dir);

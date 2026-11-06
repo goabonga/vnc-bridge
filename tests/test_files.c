@@ -6,7 +6,7 @@
 
 int main(void)
 {
-	char path[] = "/tmp/tvx-files-XXXXXX";
+	char path[] = "/tmp/vncb-files-XXXXXX";
 	int fd = mkstemp(path);
 	CHECK(fd >= 0);
 	close(fd);

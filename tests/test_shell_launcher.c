@@ -9,7 +9,7 @@
 #define SHELL "build/bin/vnc-bridge-shell"
 #define TITLE "GPD \xc2\xb7 shell local RFB"
 
-static char root[] = "/tmp/tvx-launcher-XXXXXX";
+static char root[] = "/tmp/vncb-launcher-XXXXXX";
 static char bin[300], log_path[300], home[300];
 
 static void tool(const char *name, const char *body)
