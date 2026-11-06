@@ -239,7 +239,7 @@ static void test_command_line(void)
 	CHECK(h.status == 0);
 	CHECK_STR(h.out,
 		  "Usage: vnc-bridge-telemetry "
-		  "{battery,audio,status,local-battery,local-audio} "
+		  "{daemon,battery,audio,status,local-battery,local-audio} "
 		  "[--runtime-dir DIR] [--hostname HOST] [--client PID:FD] "
 		  "[--hide-unavailable] [--i3blocks]\n");
 	free(h.out);
