@@ -237,11 +237,11 @@ static void test_command_line(void)
 	char *help[] = {"build/bin/vnc-bridge-telemetry", "--help", NULL};
 	run_result h = run_cmd(help, NULL);
 	CHECK(h.status == 0);
-	CHECK_STR(
-	    h.out,
-	    "Usage: vnc-bridge-telemetry {battery,audio,status,local-battery} "
-	    "[--runtime-dir DIR] [--hostname HOST] [--client PID:FD] "
-	    "[--hide-unavailable] [--i3blocks]\n");
+	CHECK_STR(h.out,
+		  "Usage: vnc-bridge-telemetry "
+		  "{battery,audio,status,local-battery,local-audio} "
+		  "[--runtime-dir DIR] [--hostname HOST] [--client PID:FD] "
+		  "[--hide-unavailable] [--i3blocks]\n");
 	free(h.out);
 }
 
