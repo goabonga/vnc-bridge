@@ -6,11 +6,41 @@ a peer that runs the shell and speaks the frame protocol below.
 ```sh
 make build
 build/bin/vnc-bridge-shell --connect --socket /path/to/channel.sock
+build/bin/vnc-bridge-shell --connect --runtime-dir /path/to/dir --hostname nano
 ```
 
-`--connect` and `--socket PATH` are both required (otherwise the exit status is 2).
-The program connects with a 3-second limit and refuses a peer which runs as
-another user. Messages are in French.
+`--connect` is required (otherwise the exit status is 2). The program connects with
+a 3-second limit and refuses a peer which runs as another user. Messages are in
+French.
+
+## Selecting the channel
+
+`--socket PATH` connects to this socket. Otherwise the program looks for
+`<directory>/shell/PID-FD.sock` files and needs exactly one candidate. A candidate is
+a socket owned by the current user whose process `PID` is running.
+
+| Option | Effect |
+| --- | --- |
+| `--runtime-dir DIR` | Directory containing `shell/` and `status.json` |
+| `--client PID:FD` | Keep only the socket of this identifier |
+| `--hostname HOST` | Keep only sockets whose client has this hostname in `DIR/status.json` |
+
+Without `--runtime-dir`, the directory is the `runtime_dir` of the configuration, else
+the directory of `$VNC_BRIDGE_SOCKET` (an absolute path), else
+`$XDG_RUNTIME_DIR/vnc-bridge` (`/run/user/UID` when `XDG_RUNTIME_DIR` is unset).
+Without `--hostname` and `--client`, the hostname is the `hostname` of the configuration.
+
+The configuration is the optional JSON file `~/.config/vnc-bridge/shell.json`;
+a missing or invalid file is ignored.
+
+```json
+{"runtime_dir": "/run/user/1000/vnc-bridge", "hostname": "nano"}
+```
+
+With zero or several candidates the program prints
+`Aucun canal RFB du GPD disponible. Activer VNC_BRIDGE_SHELL=1 dans le viewer et reconnecter.`
+or `Plusieurs viewers disponibles ; préciser --client PID:FD`, then the failure message
+below, and exits with status 1.
 
 ## Terminal handling
 
