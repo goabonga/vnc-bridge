@@ -18,6 +18,7 @@ build/bin/vnc-bridge-telemetry status --runtime-dir /path/to/dir
 | `audio` | `VOL 65%`, or `VOL MUET` when muted |
 | `status` | The content of `status.json`, unchanged |
 | `local-battery` | Battery of the local machine, in the `--i3blocks` format |
+| `local-audio` | Output volume of the local machine, in the `audio --i3blocks` format |
 
 ## Options
 
@@ -62,6 +63,28 @@ in the `battery --i3blocks` format; an empty line is printed when there is none.
 A `status` of `Charging` shows the bolt. When the battery reports `Unknown`, the
 first `USB` or `Mains` supply with the status `Charging`, `Discharging` or
 `Not charging` decides.
+
+## Local audio
+
+`local-audio` needs no runtime directory. It prints the volume block, or an empty
+line when no volume can be read within one second. The backend is chosen by
+`VNC_BRIDGE_AUDIO_BACKEND` (`pipewire` or `alsa`; any other value prints an empty
+line).
+
+| Backend | Command | Notes |
+| --- | --- | --- |
+| `pipewire` | `wpctl get-volume @DEFAULT_AUDIO_SINK@` | `Volume: 0.38` with an optional `[MUTED]`; levels above 1000% are rejected |
+| `alsa` | `amixer -c CARD sget CONTROL` | The loudest `Playback` channel; muted when no channel is `[on]` |
+| `alsa` with `mixer` | `mixer --card sysdefault:CARD --get CONTROL` | Reply `<percent\|-> <on\|off\|->`; `amixer` answers when `mixer` is absent or fails |
+
+| Variable | Default |
+| --- | --- |
+| `VNC_BRIDGE_AUDIO_BACKEND` | `pipewire`, or `alsa` on a GPD Pocket |
+| `VNC_BRIDGE_ALSA_CARD` | `default`, or `chtrt5645` on a GPD Pocket |
+| `VNC_BRIDGE_ALSA_CONTROL` | `Master`, or `DAC1` on a GPD Pocket |
+| `VNC_BRIDGE_ALSA_TOOL` | `mixer` on a GPD Pocket with the card `chtrt5645`, otherwise `amixer`; any value other than `mixer` selects `amixer` |
+
+A GPD Pocket is recognized by `chtrt5645` in `/proc/asound/cards`.
 
 ## Exit status
 
